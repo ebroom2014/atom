@@ -560,8 +560,8 @@ class TextEditorComponent
     screenPosition = @screenPositionForMouseEvent(event)
 
     if event.target?.classList.contains('fold-marker')
-      bufferRow = @editor.bufferRowForScreenRow(screenPosition.row)
-      @editor.unfoldBufferRow(bufferRow)
+      bufferPosition = @editor.bufferPositionForScreenPosition(screenPosition)
+      @editor.destroyFoldsIntersectingBufferRange([bufferPosition, bufferPosition])
       return
 
     switch detail
@@ -947,7 +947,7 @@ class TextEditorComponent
 
   screenPositionForMouseEvent: (event, linesClientRect) ->
     pixelPosition = @pixelPositionForMouseEvent(event, linesClientRect)
-    @screenPositionForPixelPosition(pixelPosition, true)
+    @screenPositionForPixelPosition(pixelPosition)
 
   pixelPositionForMouseEvent: (event, linesClientRect) ->
     {clientX, clientY} = event

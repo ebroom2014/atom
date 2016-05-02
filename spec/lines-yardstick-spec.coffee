@@ -155,9 +155,38 @@ describe "LinesYardstick", ->
         expect(linesYardstick.screenPositionForPixelPosition({top: 28, left: 100})).toEqual([2, 14])
         expect(linesYardstick.screenPositionForPixelPosition({top: 32, left: 24.3})).toEqual([2, 3])
         expect(linesYardstick.screenPositionForPixelPosition({top: 46, left: 66.5})).toEqual([3, 9])
-        expect(linesYardstick.screenPositionForPixelPosition({top: 80, left: 99.9})).toEqual([5, 14])
-        expect(linesYardstick.screenPositionForPixelPosition({top: 80, left: 224.2365234375})).toEqual([5, 29])
-        expect(linesYardstick.screenPositionForPixelPosition({top: 80, left: 225})).toEqual([5, 30])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 70, left: 99.9})).toEqual([5, 14])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 70, left: 224.2365234375})).toEqual([5, 29])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 70, left: 225})).toEqual([5, 30])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 84, left: 247.1})).toEqual([6, 33])
+
+      it "overshoots to the nearest character when text nodes are not spatially contiguous", ->
+        atom.styles.addStyleSheet """
+        * {
+          font-size: 12px;
+          font-family: monospace;
+        }
+        """
+
+        buildLineNode = (screenRow) ->
+          lineNode = document.createElement("div")
+          lineNode.style.whiteSpace = "pre"
+          lineNode.innerHTML = '<span>foo</span><span style="margin-left: 40px">bar</span>'
+          jasmine.attachToDOM(lineNode)
+          createdLineNodes.push(lineNode)
+          lineNode
+        editor.setText("foobar")
+
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 7})).toEqual([0, 1])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 14})).toEqual([0, 2])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 21})).toEqual([0, 3])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 30})).toEqual([0, 3])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 50})).toEqual([0, 3])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 62})).toEqual([0, 3])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 69})).toEqual([0, 4])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 76})).toEqual([0, 5])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 100})).toEqual([0, 6])
+        expect(linesYardstick.screenPositionForPixelPosition({top: 0, left: 200})).toEqual([0, 6])
 
       it "clips pixel positions above buffer start", ->
         expect(linesYardstick.screenPositionForPixelPosition(top: -Infinity, left: -Infinity)).toEqual [0, 0]
@@ -170,3 +199,7 @@ describe "LinesYardstick", ->
         expect(linesYardstick.screenPositionForPixelPosition(top: Infinity, left: Infinity)).toEqual [12, 2]
         expect(linesYardstick.screenPositionForPixelPosition(top: (editor.getLastScreenRow() + 1) * 14, left: 0)).toEqual [12, 2]
         expect(linesYardstick.screenPositionForPixelPosition(top: editor.getLastScreenRow() * 14, left: 0)).toEqual [12, 0]
+
+      it "clips negative horizontal pixel positions", ->
+        expect(linesYardstick.screenPositionForPixelPosition(top: 0, left: -10)).toEqual [0, 0]
+        expect(linesYardstick.screenPositionForPixelPosition(top: 1 * 14, left: -10)).toEqual [1, 0]

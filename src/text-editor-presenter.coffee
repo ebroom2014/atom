@@ -177,7 +177,6 @@ class TextEditorPresenter
 
     @scrollPastEnd = @config.get('editor.scrollPastEnd', configParams)
     @showLineNumbers = @config.get('editor.showLineNumbers', configParams)
-    @showIndentGuide = @config.get('editor.showIndentGuide', configParams)
 
     if @configDisposables?
       @configDisposables?.dispose()
@@ -186,10 +185,6 @@ class TextEditorPresenter
     @configDisposables = new CompositeDisposable
     @disposables.add(@configDisposables)
 
-    @configDisposables.add @config.onDidChange 'editor.showIndentGuide', configParams, ({newValue}) =>
-      @showIndentGuide = newValue
-
-      @emitDidUpdateState()
     @configDisposables.add @config.onDidChange 'editor.scrollPastEnd', configParams, ({newValue}) =>
       @scrollPastEnd = newValue
       @updateScrollHeight()
@@ -297,7 +292,6 @@ class TextEditorPresenter
     @state.content.width = Math.max(@contentWidth + @verticalScrollbarWidth, @contentFrameWidth)
     @state.content.scrollWidth = @scrollWidth
     @state.content.scrollLeft = @scrollLeft
-    @state.content.indentGuidesVisible = not @model.isMini() and @showIndentGuide
     @state.content.backgroundColor = if @model.isMini() then null else @backgroundColor
     @state.content.placeholderText = if @model.isEmpty() then @model.getPlaceholderText() else null
 
@@ -1129,9 +1123,9 @@ class TextEditorPresenter
     @customGutterDecorationsByGutterName = {}
 
     for decorationId, decorationState of @decorations
-      {properties, screenRange, rangeIsReversed} = decorationState
+      {properties, bufferRange, screenRange, rangeIsReversed} = decorationState
       if Decoration.isType(properties, 'line') or Decoration.isType(properties, 'line-number')
-        @addToLineDecorationCaches(decorationId, properties, screenRange, rangeIsReversed)
+        @addToLineDecorationCaches(decorationId, properties, bufferRange, screenRange, rangeIsReversed)
 
       else if Decoration.isType(properties, 'gutter') and properties.gutterName?
         @customGutterDecorationsByGutterName[properties.gutterName] ?= {}
@@ -1152,7 +1146,7 @@ class TextEditorPresenter
 
     return
 
-  addToLineDecorationCaches: (decorationId, properties, screenRange, rangeIsReversed) ->
+  addToLineDecorationCaches: (decorationId, properties, bufferRange, screenRange, rangeIsReversed) ->
     if screenRange.isEmpty()
       return if properties.onlyNonEmpty
     else
@@ -1160,21 +1154,28 @@ class TextEditorPresenter
       omitLastRow = screenRange.end.column is 0
 
     if rangeIsReversed
-      headPosition = screenRange.start
+      headScreenPosition = screenRange.start
+      headBufferPosition = bufferRange.start
     else
-      headPosition = screenRange.end
+      headScreenPosition = screenRange.end
+      headBufferPosition = bufferRange.end
 
-    for row in [screenRange.start.row..screenRange.end.row] by 1
-      continue if properties.onlyHead and row isnt headPosition.row
-      continue if omitLastRow and row is screenRange.end.row
+    if properties.class is 'folded' and Decoration.isType(properties, 'line-number')
+      screenRow = @model.screenRowForBufferRow(headBufferPosition.row)
+      @lineNumberDecorationsByScreenRow[screenRow] ?= {}
+      @lineNumberDecorationsByScreenRow[screenRow][decorationId] = properties
+    else
+      for row in [screenRange.start.row..screenRange.end.row] by 1
+        continue if properties.onlyHead and row isnt headScreenPosition.row
+        continue if omitLastRow and row is screenRange.end.row
 
-      if Decoration.isType(properties, 'line')
-        @lineDecorationsByScreenRow[row] ?= {}
-        @lineDecorationsByScreenRow[row][decorationId] = properties
+        if Decoration.isType(properties, 'line')
+          @lineDecorationsByScreenRow[row] ?= {}
+          @lineDecorationsByScreenRow[row][decorationId] = properties
 
-      if Decoration.isType(properties, 'line-number')
-        @lineNumberDecorationsByScreenRow[row] ?= {}
-        @lineNumberDecorationsByScreenRow[row][decorationId] = properties
+        if Decoration.isType(properties, 'line-number')
+          @lineNumberDecorationsByScreenRow[row] ?= {}
+          @lineNumberDecorationsByScreenRow[row][decorationId] = properties
 
     return
 

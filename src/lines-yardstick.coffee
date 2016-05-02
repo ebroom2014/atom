@@ -20,7 +20,7 @@ class LinesYardstick
     targetLeft = pixelPosition.left
     defaultCharWidth = @model.getDefaultCharWidth()
     row = @lineTopIndex.rowForPixelPosition(targetTop)
-    targetLeft = 0 if targetTop < 0
+    targetLeft = 0 if targetTop < 0 or targetLeft < 0
     targetLeft = Infinity if row > @model.getLastScreenRow()
     row = Math.min(row, @model.getLastScreenRow())
     row = Math.max(0, row)
@@ -32,32 +32,51 @@ class LinesYardstick
     lineOffset = lineNode.getBoundingClientRect().left
     targetLeft += lineOffset
 
+    textNodeIndex = 0
+    low = 0
+    high = textNodes.length - 1
+    while low <= high
+      mid = low + (high - low >> 1)
+      textNode = textNodes[mid]
+      rangeRect = @clientRectForRange(textNode, 0, textNode.length)
+      if targetLeft < rangeRect.left
+        high = mid - 1
+        textNodeIndex = Math.max(0, mid - 1)
+      else if targetLeft > rangeRect.right
+        low = mid + 1
+        textNodeIndex = Math.min(textNodes.length - 1, mid + 1)
+      else
+        textNodeIndex = mid
+        break
+
+    textNode = textNodes[textNodeIndex]
+    characterIndex = 0
+    low = 0
+    high = textNode.textContent.length - 1
+    while low <= high
+      charIndex = low + (high - low >> 1)
+      if isPairedCharacter(textNode.textContent, charIndex)
+        nextCharIndex = charIndex + 2
+      else
+        nextCharIndex = charIndex + 1
+
+      rangeRect = @clientRectForRange(textNode, charIndex, nextCharIndex)
+      if targetLeft < rangeRect.left
+        high = charIndex - 1
+        characterIndex = Math.max(0, charIndex - 1)
+      else if targetLeft > rangeRect.right
+        low = nextCharIndex
+        characterIndex = Math.min(textNode.textContent.length, nextCharIndex)
+      else
+        if targetLeft <= ((rangeRect.left + rangeRect.right) / 2)
+          characterIndex = charIndex
+        else
+          characterIndex = nextCharIndex
+        break
+
     textNodeStartColumn = 0
-    for textNode in textNodes
-      {length: textNodeLength, textContent: textNodeContent} = textNode
-      textNodeRight = @clientRectForRange(textNode, 0, textNodeLength).right
-
-      if textNodeRight > targetLeft
-        characterIndex = 0
-        while characterIndex < textNodeLength
-          if isPairedCharacter(textNodeContent, characterIndex)
-            nextCharacterIndex = characterIndex + 2
-          else
-            nextCharacterIndex = characterIndex + 1
-
-          rangeRect = @clientRectForRange(textNode, characterIndex, nextCharacterIndex)
-
-          if rangeRect.right > targetLeft
-            if targetLeft <= ((rangeRect.left + rangeRect.right) / 2)
-              return Point(row, textNodeStartColumn + characterIndex)
-            else
-              return Point(row, textNodeStartColumn + nextCharacterIndex)
-          else
-            characterIndex = nextCharacterIndex
-
-      textNodeStartColumn += textNodeLength
-
-    Point(row, textNodeStartColumn)
+    textNodeStartColumn += textNodes[i].length for i in [0...textNodeIndex] by 1
+    Point(row, textNodeStartColumn + characterIndex)
 
   pixelPositionForScreenPosition: (screenPosition) ->
     targetRow = screenPosition.row

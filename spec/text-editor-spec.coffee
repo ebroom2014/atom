@@ -1186,14 +1186,10 @@ describe "TextEditor", ->
           cursor2 = editor.addCursorAtBufferPosition([1, 4])
           expect(cursor2.marker).toBe cursor1.marker
 
-    describe '.logCursorScope()', ->
-      beforeEach ->
-        spyOn(atom.notifications, 'addInfo')
-
-      it 'opens a notification', ->
-        editor.logCursorScope()
-
-        expect(atom.notifications.addInfo).toHaveBeenCalled()
+    describe '.getCursorScope()', ->
+      it 'returns the current scope', ->
+        descriptor = editor.getCursorScope()
+        expect(descriptor.scopes).toContain('source.js')
 
   describe "selection", ->
     selection = null
@@ -5742,28 +5738,6 @@ describe "TextEditor", ->
       expect(handler).toHaveBeenCalledWith 'OK'
       expect(editor.getPlaceholderText()).toBe 'OK'
 
-  describe ".checkoutHeadRevision()", ->
-    it "reverts to the version of its file checked into the project repository", ->
-      atom.config.set("editor.confirmCheckoutHeadRevision", false)
-
-      editor.setCursorBufferPosition([0, 0])
-      editor.insertText("---\n")
-      expect(editor.lineTextForBufferRow(0)).toBe "---"
-
-      waitsForPromise ->
-        editor.checkoutHeadRevision()
-
-      runs ->
-        expect(editor.lineTextForBufferRow(0)).toBe "var quicksort = function () {"
-
-    describe "when there's no repository for the editor's file", ->
-      it "doesn't do anything", ->
-        editor = atom.workspace.buildTextEditor()
-        editor.setText("stuff")
-        editor.checkoutHeadRevision()
-
-        waitsForPromise -> editor.checkoutHeadRevision()
-
   describe 'gutters', ->
     describe 'the TextEditor constructor', ->
       it 'creates a line-number gutter', ->
@@ -5892,6 +5866,7 @@ describe "TextEditor", ->
         expect(editor.decorationsStateForScreenRowRange(0, 5)[decoration.id]).toEqual {
           properties: {type: 'highlight', class: 'foo'}
           screenRange: marker.getScreenRange(),
+          bufferRange: marker.getBufferRange(),
           rangeIsReversed: false
         }
 
@@ -5912,26 +5887,31 @@ describe "TextEditor", ->
         expect(decorationState["#{layer1Decoration1.id}-#{marker1.id}"]).toEqual {
           properties: {type: 'highlight', class: 'foo'},
           screenRange: marker1.getRange(),
+          bufferRange: marker1.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer1Decoration1.id}-#{marker2.id}"]).toEqual {
           properties: {type: 'highlight', class: 'foo'},
           screenRange: marker2.getRange(),
+          bufferRange: marker2.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer1Decoration2.id}-#{marker1.id}"]).toEqual {
           properties: {type: 'highlight', class: 'bar'},
           screenRange: marker1.getRange(),
+          bufferRange: marker1.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer1Decoration2.id}-#{marker2.id}"]).toEqual {
           properties: {type: 'highlight', class: 'bar'},
           screenRange: marker2.getRange(),
+          bufferRange: marker2.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer2Decoration.id}-#{marker3.id}"]).toEqual {
           properties: {type: 'highlight', class: 'baz'},
           screenRange: marker3.getRange(),
+          bufferRange: marker3.getRange(),
           rangeIsReversed: false
         }
 
@@ -5943,16 +5923,19 @@ describe "TextEditor", ->
         expect(decorationState["#{layer1Decoration2.id}-#{marker1.id}"]).toEqual {
           properties: {type: 'highlight', class: 'bar'},
           screenRange: marker1.getRange(),
+          bufferRange: marker1.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer1Decoration2.id}-#{marker2.id}"]).toEqual {
           properties: {type: 'highlight', class: 'bar'},
           screenRange: marker2.getRange(),
+          bufferRange: marker2.getRange(),
           rangeIsReversed: false
         }
         expect(decorationState["#{layer2Decoration.id}-#{marker3.id}"]).toEqual {
           properties: {type: 'highlight', class: 'baz'},
           screenRange: marker3.getRange(),
+          bufferRange: marker3.getRange(),
           rangeIsReversed: false
         }
 
@@ -5961,6 +5944,7 @@ describe "TextEditor", ->
         expect(decorationState["#{layer1Decoration2.id}-#{marker1.id}"]).toEqual {
           properties: {type: 'highlight', class: 'quux'},
           screenRange: marker1.getRange(),
+          bufferRange: marker1.getRange(),
           rangeIsReversed: false
         }
 
@@ -5969,6 +5953,7 @@ describe "TextEditor", ->
         expect(decorationState["#{layer1Decoration2.id}-#{marker1.id}"]).toEqual {
           properties: {type: 'highlight', class: 'bar'},
           screenRange: marker1.getRange(),
+          bufferRange: marker1.getRange(),
           rangeIsReversed: false
         }
 
@@ -5981,6 +5966,20 @@ describe "TextEditor", ->
     it "ignores invisibles even if editor.showInvisibles is true", ->
       atom.config.set('editor.showInvisibles', true)
       expect(editor.lineTextForScreenRow(0).indexOf(atom.config.get('editor.invisibles.eol'))).toBe(-1)
+
+  describe "indent guides", ->
+    it "shows indent guides when `editor.showIndentGuide` is set to true and the editor is not mini", ->
+      editor.setText("  foo")
+      atom.config.set('editor.tabLength', 2)
+
+      atom.config.set('editor.showIndentGuide', false)
+      expect(editor.tokensForScreenRow(0)).toEqual ['source.js', 'leading-whitespace']
+
+      atom.config.set('editor.showIndentGuide', true)
+      expect(editor.tokensForScreenRow(0)).toEqual ['source.js', 'leading-whitespace indent-guide']
+
+      editor.setMini(true)
+      expect(editor.tokensForScreenRow(0)).toEqual ['source.js', 'leading-whitespace']
 
   describe "when the editor is constructed with the grammar option set", ->
     beforeEach ->
